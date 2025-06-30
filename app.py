@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import plotly.express as px
 
 st.set_page_config(page_title="Personal Expense Tracker", page_icon="💸", layout="wide")
 
@@ -49,7 +50,7 @@ if not st.session_state.logged_in:
                     st.success(f"✅ Welcome, {username}! Please use the sidebar to begin.")
                     st.stop()
 
-        else:  # Returning user
+        else:  # Returning User
             username = st.text_input("Enter your username:")
             if st.button("Load Data"):
                 filepath = f"{username}.csv"
@@ -80,12 +81,14 @@ if st.session_state.logged_in:
 
     if menu == "Add New Expense":
         st.header("➕ Add a New Expense")
-
         with st.form("expense_form"):
             col1, col2 = st.columns(2)
             with col1:
                 date = st.date_input("Date")
-                category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Investments", "Utilities", "Investments", "Other"])
+                category = st.selectbox(
+                    "Category",
+                    ["Food", "Transport", "Entertainment", "Utilities", "Investments", "Other"]
+                )
             with col2:
                 amount = st.number_input("Amount", min_value=0.0, format="%.2f")
                 currency = st.selectbox("Currency", ["USD", "EUR", "INR", "GBP", "JPY"])
@@ -131,7 +134,7 @@ if st.session_state.logged_in:
                 mime="text/csv"
             )
 
-        elif menu == "Summary":
+    elif menu == "Summary":
         st.header("📊 Summary")
         if df.empty:
             st.info("No expenses to summarize yet.")
@@ -141,55 +144,39 @@ if st.session_state.logged_in:
                 start_date = st.date_input("Start Date", df["Date"].min().date(), key="summary_start")
             with col2:
                 end_date = st.date_input("End Date", df["Date"].max().date(), key="summary_end")
-    
+
             filtered_df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
-    
+
             if filtered_df.empty:
                 st.warning("No expenses in this date range.")
             else:
                 st.subheader("💡 Total by Category")
-    
                 category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
                 st.dataframe(category_summary)
-    
-                st.plotly_chart(
-                    {
-                        "data": [{
-                            "labels": category_summary["Category"],
-                            "values": category_summary["Amount"],
-                            "type": "pie",
-                            "hole": 0.4
-                        }],
-                        "layout": {
-                            "title": "Expenses by Category",
-                            "showlegend": True
-                        }
-                    },
-                    use_container_width=True
+
+                fig_cat = px.pie(
+                    category_summary,
+                    names="Category",
+                    values="Amount",
+                    title="Expenses by Category",
+                    hole=0.4
                 )
-    
+                st.plotly_chart(fig_cat, use_container_width=True)
+
                 st.subheader("💡 Total by Currency")
-    
                 currency_summary = filtered_df.groupby("Currency")["Amount"].sum().reset_index()
                 st.dataframe(currency_summary)
-    
-                st.plotly_chart(
-                    {
-                        "data": [{
-                            "x": currency_summary["Currency"],
-                            "y": currency_summary["Amount"],
-                            "type": "bar",
-                            "marker": {"color": "teal"}
-                        }],
-                        "layout": {
-                            "title": "Expenses by Currency",
-                            "xaxis": {"title": "Currency"},
-                            "yaxis": {"title": "Amount"}
-                        }
-                    },
-                    use_container_width=True
+
+                fig_cur = px.bar(
+                    currency_summary,
+                    x="Currency",
+                    y="Amount",
+                    title="Expenses by Currency",
+                    color="Currency",
+                    text_auto=True
                 )
-    
+                st.plotly_chart(fig_cur, use_container_width=True)
+
                 st.subheader("💡 Overall Spend")
                 total_spend = filtered_df["Amount"].sum()
                 st.success(f"💰 **Total Amount:** {total_spend:.2f} (Mixed currencies)")
