@@ -11,7 +11,8 @@ Built using Python, Streamlit, pandas, and matplotlib.
 ## How to Run Locally
 1. Clone this repository:
 ```
-git clone https://github.com/Vihaan-Bhambhani/Expense-Tracker-Web```
+git clone https://github.com/Vihaan-Bhambhani/Expense-Tracker-Web
+```
 
 2. Install dependencies:
 ```
