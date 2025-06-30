@@ -12,7 +12,7 @@ st.markdown(
 
 # Helper functions
 def load_user_data(username):
-    filepath = f"{username}.csv"
+    filepath = f"{username.lower()}.csv"
     if os.path.exists(filepath):
         df = pd.read_csv(filepath)
         df["Date"] = pd.to_datetime(df["Date"])
@@ -21,7 +21,7 @@ def load_user_data(username):
         return pd.DataFrame(columns=["Date", "Category", "Amount", "Currency", "Description"])
 
 def save_user_data(username, data):
-    data.to_csv(f"{username}.csv", index=False)
+    data.to_csv(f"{username.lower()}.csv", index=False)
 
 # Initialize session state
 if "logged_in" not in st.session_state:
@@ -31,39 +31,34 @@ if "logged_in" not in st.session_state:
 
 # User login/registration
 if not st.session_state.logged_in:
-    with st.container():
-        st.subheader("👤 User Login / Registration")
-        mode = st.radio("Select Mode:", ["New User", "Returning User"])
+    st.subheader("👤 User Login / Registration")
+    mode = st.radio("Select Mode:", ["New User", "Returning User"])
+    username_input = st.text_input("Username:")
 
-        if mode == "New User":
-            username = st.text_input("Create a username:")
-            if st.button("Start"):
-                filepath = f"{username}.csv"
-                if not username:
-                    st.warning("Please enter a username.")
-                elif os.path.exists(filepath):
-                    st.error("Username already exists. Please try a different one.")
-                else:
-                    st.session_state.username = username
-                    st.session_state.df = load_user_data(username)
-                    st.session_state.logged_in = True
-                    st.success(f"✅ Welcome, {username}! Please use the sidebar to begin.")
-                    st.stop()
+    if st.button("Proceed"):
+        username = username_input.strip().lower()
+        filepath = f"{username}.csv"
 
+        if not username:
+            st.warning("Please enter a username.")
+        elif mode == "New User":
+            if os.path.exists(filepath):
+                st.error("Username already exists. Please choose a different one.")
+            else:
+                st.session_state.username = username
+                st.session_state.df = load_user_data(username)
+                st.session_state.logged_in = True
+                st.success(f"✅ Welcome, {username_input}!")
         else:  # Returning User
-            username = st.text_input("Enter your username:")
-            if st.button("Load Data"):
-                filepath = f"{username}.csv"
-                if not username:
-                    st.warning("Please enter your username.")
-                elif not os.path.exists(filepath):
-                    st.error("Username not found. Please check or register as a new user.")
-                else:
-                    st.session_state.username = username
-                    st.session_state.df = load_user_data(username)
-                    st.session_state.logged_in = True
-                    st.success(f"✅ Welcome back, {username}! Please use the sidebar to continue.")
-                    st.stop()
+            if not os.path.exists(filepath):
+                st.error("Username not found. Please check or register as a new user.")
+            else:
+                st.session_state.username = username
+                st.session_state.df = load_user_data(username)
+                st.session_state.logged_in = True
+                st.success(f"✅ Welcome back, {username_input}!")
+
+    st.stop()
 
 # Main app
 if st.session_state.logged_in:
@@ -71,7 +66,7 @@ if st.session_state.logged_in:
     df = st.session_state.df
 
     st.sidebar.markdown(f"👋 **Logged in as:** `{username}`")
-    menu = st.sidebar.radio("📌 Navigate", ["Add New Expense", "View Expenses", "Summary"])
+    menu = st.sidebar.radio("📌 Navigate", ["Add New Expense", "View Expenses", "Summary", "Currency Converter"])
     st.sidebar.markdown("---")
     if st.sidebar.button("🔓 Logout"):
         st.session_state.logged_in = False
@@ -180,3 +175,31 @@ if st.session_state.logged_in:
                 st.subheader("💡 Overall Spend")
                 total_spend = filtered_df["Amount"].sum()
                 st.success(f"💰 **Total Amount:** {total_spend:.2f} (Mixed currencies)")
+
+    elif menu == "Currency Converter":
+        st.header("💱 Currency Converter")
+
+        # Example rates (these can be dynamic or user-input)
+        exchange_rates = {
+            "USD": 1.0,
+            "EUR": 0.92,
+            "INR": 83.0,
+            "GBP": 0.78,
+            "JPY": 155.0
+        }
+
+        col1, col2 = st.columns(2)
+        with col1:
+            amount = st.number_input("Amount", min_value=0.0, format="%.2f")
+            from_currency = st.selectbox("From Currency", list(exchange_rates.keys()))
+        with col2:
+            to_currency = st.selectbox("To Currency", list(exchange_rates.keys()))
+
+        if st.button("Convert"):
+            if from_currency == to_currency:
+                st.info("Same currency selected. Amount unchanged.")
+            else:
+                # Convert to USD base, then to target
+                amount_in_usd = amount / exchange_rates[from_currency]
+                converted = amount_in_usd * exchange_rates[to_currency]
+                st.success(f"{amount:.2f} {from_currency} = {converted:.2f} {to_currency}")
