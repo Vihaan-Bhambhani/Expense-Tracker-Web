@@ -1,88 +1,116 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
 
-st.title("Personal Expense Tracker")
+st.title("💸 Personal Expense Tracker")
 
-# Currency selection
-currency_map = {
-    "INR": "₹",
-    "USD": "$",
-    "EUR": "€",
-    "GBP": "£",
-    "JPY": "¥"
-}
-selected_currency = st.sidebar.selectbox("Select Currency", list(currency_map.keys()))
-currency_symbol = currency_map[selected_currency]
+# Helper functions
+def load_user_data(username):
+    filepath = f"{username}.csv"
+    if os.path.exists(filepath):
+        return pd.read_csv(filepath)
+    else:
+        return pd.DataFrame(columns=["Date", "Category", "Amount", "Currency", "Description"])
 
-# File to store data
-DATA_FILE = 'expenses.csv'
+def save_user_data(username, data):
+    data.to_csv(f"{username}.csv", index=False)
 
-# Load or create dataframe
-if os.path.exists(DATA_FILE):
-    try:
-        df = pd.read_csv(DATA_FILE, parse_dates=['date'])
-        if 'date' not in df.columns:
-            raise ValueError("Missing 'date' column")
-    except Exception as e:
-        st.warning(f"CSV load issue: {e}. Creating fresh file.")
-        df = pd.DataFrame(columns=['date', 'category', 'amount', 'description'])
-        df.to_csv(DATA_FILE, index=False)
-else:
-    df = pd.DataFrame(columns=['date', 'category', 'amount', 'description'])
-    df.to_csv(DATA_FILE, index=False)
+# USER MODE SELECTION
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.session_state.df = pd.DataFrame()
 
-# Add Expense
-st.header("Add New Expense")
-date = st.date_input("Date")
-category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Utilities", "Other"])
-amount = st.number_input(f"Amount ({currency_symbol})", min_value=0.0, format="%.2f")
-description = st.text_input("Description")
+if not st.session_state.logged_in:
+    mode = st.radio("Select Mode:", ["New User", "Returning User"])
 
-if st.button("Add Expense"):
-    new_expense = {'date': pd.to_datetime(date), 'category': category, 'amount': amount, 'description': description}
-    df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
-    df.to_csv(DATA_FILE, index=False)
-    st.success("Expense added!")
+    if mode == "New User":
+        username = st.text_input("Create a username:")
+        if st.button("Start"):
+            filepath = f"{username}.csv"
+            if not username:
+                st.warning("Please enter a username.")
+            elif os.path.exists(filepath):
+                st.error("Username already exists. Please try a different one.")
+            else:
+                st.session_state.username = username
+                st.session_state.df = load_user_data(username)
+                st.session_state.logged_in = True
+                st.success(f"Welcome, {username}!")
+    else:  # Returning User
+        username = st.text_input("Enter your username:")
+        if st.button("Load Data"):
+            filepath = f"{username}.csv"
+            if not username:
+                st.warning("Please enter your username.")
+            elif not os.path.exists(filepath):
+                st.error("Username not found. Please check or register as a new user.")
+            else:
+                st.session_state.username = username
+                st.session_state.df = load_user_data(username)
+                st.session_state.logged_in = True
+                st.success(f"Welcome back, {username}!")
 
-# View Expenses
-st.header("View Expenses")
-if not df.empty:
-    df['amount_with_symbol'] = currency_symbol + df['amount'].round(2).astype(str)
-    st.dataframe(df[['date', 'category', 'amount_with_symbol', 'description']])
-else:
-    st.info("No expenses yet. Add some!")
+# MAIN APP ONCE LOGGED IN
+if st.session_state.logged_in:
+    # Sidebar navigation
+    menu = st.sidebar.radio(
+        "📌 Navigate",
+        ["Add New Expense", "View Expenses", "Summary"]
+    )
 
-# Summary
-st.header("Summary")
-if not df.empty and 'date' in df.columns:
-    try:
-        df['month'] = df['date'].dt.to_period('M').astype(str)
+    df = st.session_state.df
+    username = st.session_state.username
 
-        # Category summary
-        cat_sum = df.groupby("category")["amount"].sum()
-        st.write(f"### Total Spent by Category ({currency_symbol})")
-        fig1, ax1 = plt.subplots()
-        cat_sum.plot(kind='bar', ax=ax1)
-        ax1.set_ylabel(f"Amount ({currency_symbol})")
-        st.pyplot(fig1)
+    if menu == "Add New Expense":
+        st.header("➕ Add a New Expense")
+        date = st.date_input("Date")
+        category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Utilities", "Other"])
+        amount = st.number_input("Amount", min_value=0.0, format="%.2f")
+        currency = st.selectbox("Currency", ["USD", "EUR", "INR", "GBP", "JPY"])
+        description = st.text_input("Description")
 
-        # Pie chart
-        fig2, ax2 = plt.subplots()
-        cat_sum.plot(kind='pie', autopct='%1.1f%%', ax=ax2)
-        ax2.set_ylabel("")
-        ax2.set_title(f"Category Distribution ({currency_symbol})")
-        st.pyplot(fig2)
+        if st.button("Add Expense"):
+            new_expense = {
+                "Date": date,
+                "Category": category,
+                "Amount": amount,
+                "Currency": currency,
+                "Description": description
+            }
+            df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
+            save_user_data(username, df)
+            st.session_state.df = df
+            st.success("Expense added!")
 
-        # Monthly summary
-        month_sum = df.groupby('month')['amount'].sum()
-        st.write(f"### Total Spent by Month ({currency_symbol})")
-        fig3, ax3 = plt.subplots()
-        month_sum.plot(kind='line', marker='o', ax=ax3)
-        ax3.set_ylabel(f"Amount ({currency_symbol})")
-        st.pyplot(fig3)
-    except Exception as e:
-        st.warning(f"Error generating summary: {e}")
-else:
-    st.info("No data for summary yet.")
+    elif menu == "View Expenses":
+        st.header("📄 Your Expenses")
+        st.dataframe(df)
+
+    elif menu == "Summary":
+        st.header("📊 Summary")
+
+        if df.empty:
+            st.info("No expenses to summarize yet.")
+        else:
+            # Total by category
+            st.subheader("Total by Category")
+            category_summary = df.groupby("Category")["Amount"].sum().reset_index()
+            st.dataframe(category_summary)
+
+            # Total by currency
+            st.subheader("Total by Currency")
+            currency_summary = df.groupby("Currency")["Amount"].sum().reset_index()
+            st.dataframe(currency_summary)
+
+            # Show total spend
+            st.subheader("Overall Spend")
+            total_spend = df["Amount"].sum()
+            st.write(f"💰 **Total Amount:** {total_spend:.2f} (Mixed currencies)")
+
+    # Logout option
+    if st.sidebar.button("🔓 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.session_state.df = pd.DataFrame()
+        st.experimental_rerun()
