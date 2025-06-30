@@ -132,29 +132,64 @@ if st.session_state.logged_in:
             )
 
     elif menu == "Summary":
-        st.header("📊 Summary")
-        if df.empty:
-            st.info("No expenses to summarize yet.")
+    st.header("📊 Summary")
+    if df.empty:
+        st.info("No expenses to summarize yet.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start Date", df["Date"].min().date(), key="summary_start")
+        with col2:
+            end_date = st.date_input("End Date", df["Date"].max().date(), key="summary_end")
+
+        filtered_df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
+
+        if filtered_df.empty:
+            st.warning("No expenses in this date range.")
         else:
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Start Date", df["Date"].min().date(), key="summary_start")
-            with col2:
-                end_date = st.date_input("End Date", df["Date"].max().date(), key="summary_end")
+            st.subheader("💡 Total by Category")
 
-            filtered_df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
+            category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
+            st.dataframe(category_summary)
 
-            if filtered_df.empty:
-                st.warning("No expenses in this date range.")
-            else:
-                st.subheader("💡 Total by Category")
-                category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
-                st.dataframe(category_summary)
+            st.plotly_chart(
+                {
+                    "data": [{
+                        "labels": category_summary["Category"],
+                        "values": category_summary["Amount"],
+                        "type": "pie",
+                        "hole": 0.4
+                    }],
+                    "layout": {
+                        "title": "Expenses by Category",
+                        "showlegend": True
+                    }
+                },
+                use_container_width=True
+            )
 
-                st.subheader("💡 Total by Currency")
-                currency_summary = filtered_df.groupby("Currency")["Amount"].sum().reset_index()
-                st.dataframe(currency_summary)
+            st.subheader("💡 Total by Currency")
 
-                st.subheader("💡 Overall Spend")
-                total_spend = filtered_df["Amount"].sum()
-                st.write(f"💰 **Total Amount:** {total_spend:.2f} (Mixed currencies)")
+            currency_summary = filtered_df.groupby("Currency")["Amount"].sum().reset_index()
+            st.dataframe(currency_summary)
+
+            st.plotly_chart(
+                {
+                    "data": [{
+                        "x": currency_summary["Currency"],
+                        "y": currency_summary["Amount"],
+                        "type": "bar",
+                        "marker": {"color": "teal"}
+                    }],
+                    "layout": {
+                        "title": "Expenses by Currency",
+                        "xaxis": {"title": "Currency"},
+                        "yaxis": {"title": "Amount"}
+                    }
+                },
+                use_container_width=True
+            )
+
+            st.subheader("💡 Overall Spend")
+            total_spend = filtered_df["Amount"].sum()
+            st.success(f"💰 **Total Amount:** {total_spend:.2f} (Mixed currencies)")
