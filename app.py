@@ -46,8 +46,9 @@ if not st.session_state.logged_in:
                     st.session_state.username = username
                     st.session_state.df = load_user_data(username)
                     st.session_state.logged_in = True
-                    st.success(f"Welcome, {username}!")
-                    st.experimental_rerun()
+                    st.success(f"✅ Welcome, {username}! Please use the sidebar to begin.")
+                    st.stop()
+
         else:  # Returning user
             username = st.text_input("Enter your username:")
             if st.button("Load Data"):
@@ -60,8 +61,8 @@ if not st.session_state.logged_in:
                     st.session_state.username = username
                     st.session_state.df = load_user_data(username)
                     st.session_state.logged_in = True
-                    st.success(f"Welcome back, {username}!")
-                    st.experimental_rerun()
+                    st.success(f"✅ Welcome back, {username}! Please use the sidebar to continue.")
+                    st.stop()
 
 # Main app
 if st.session_state.logged_in:
@@ -84,7 +85,7 @@ if st.session_state.logged_in:
             col1, col2 = st.columns(2)
             with col1:
                 date = st.date_input("Date")
-                category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Utilities", "Other"])
+                category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Investments", "Utilities", "Other"])
             with col2:
                 amount = st.number_input("Amount", min_value=0.0, format="%.2f")
                 currency = st.selectbox("Currency", ["USD", "EUR", "INR", "GBP", "JPY"])
@@ -117,8 +118,18 @@ if st.session_state.logged_in:
                 end_date = st.date_input("End Date", df["Date"].max().date())
 
             filtered_df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
+
             st.write(f"Showing expenses from **{start_date}** to **{end_date}**")
             st.dataframe(filtered_df)
+
+            # Download button
+            csv = filtered_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name=f"{username}_expenses_{start_date}_to_{end_date}.csv",
+                mime="text/csv"
+            )
 
     elif menu == "Summary":
         st.header("📊 Summary")
