@@ -85,7 +85,7 @@ if st.session_state.logged_in:
             col1, col2 = st.columns(2)
             with col1:
                 date = st.date_input("Date")
-                category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Investments", "Utilities", "Other"])
+                category = st.selectbox("Category", ["Food", "Transport", "Entertainment", "Investments", "Utilities", "Investments", "Other"])
             with col2:
                 amount = st.number_input("Amount", min_value=0.0, format="%.2f")
                 currency = st.selectbox("Currency", ["USD", "EUR", "INR", "GBP", "JPY"])
