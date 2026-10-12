@@ -64,7 +64,7 @@ def test_primary_workflow(page):
     suffix = f"qa{int(time.time()) % 100000000:08d}"
     if APP_KIND == "expense":
         workspace = suffix[:24]
-        page.get_by_label("Workspace name").fill(workspace)
+        page.locator('input[aria-label="Workspace name"]').fill(workspace)
         click_button(page, "Continue")
         expect(page.locator("body")).to_contain_text("Spending Summary")
         expect(page.locator("body")).to_contain_text("Transactions")
@@ -96,11 +96,12 @@ def test_primary_workflow(page):
         page.get_by_label("To Currency").click()
         page.get_by_text("INR", exact=True).last.click()
         click_button(page, "Convert")
-        expect(page.locator("body")).to_contain_text("8300")
+        expect(page.locator("body")).to_contain_text(re.compile(r"100\.00 USD = [\d,]+(?:\.\d+)? INR"))
+        expect(page.locator("body")).to_contain_text("Rate date:")
         # Close and reopen workspace to check persistence in the hosted filesystem.
         page.get_by_role("button", name=re.compile("Close Workspace", re.I)).click()
         page.get_by_text("Open Existing Workspace", exact=True).click()
-        page.get_by_label("Workspace name").fill(workspace)
+        page.locator('input[aria-label="Workspace name"]').fill(workspace)
         click_button(page, "Continue")
         page.get_by_text("View Expenses", exact=True).click()
         expect(page.locator("body")).to_contain_text("Synthetic QA smoke-test expense")
