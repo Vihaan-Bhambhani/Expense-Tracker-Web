@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 import pandas as pd
+import requests
 import plotly.express as px
 import streamlit as st
 
@@ -43,6 +44,45 @@ st.markdown("""
     <p>Record your expenses, understand category mix, and explore monthly spending trends.</p>
 </div>
 """, unsafe_allow_html=True)
+
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_exchange_rates(base_currency: str) -> tuple[dict[str, float], str]:
+    """Fetch latest published reference rates from Frankfurter (daily, not intraday)."""
+    response = requests.get(
+        "https://api.frankfurter.dev/v2/rates",
+        params={"base": base_currency},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+
+    rates = {base_currency: 1.0}
+    rate_date = None
+    for item in payload:
+        quote = item.get("quote")
+        rate = item.get("rate")
+        if quote and isinstance(rate, (int, float)) and rate > 0:
+            rates[quote] = float(rate)
+            rate_date = max(rate_date or item.get("date", ""), item.get("date", ""))
+
+    if len(rates) < 2:
+        raise ValueError("The exchange-rate service returned no usable rates.")
+    return rates, rate_date or "date not supplied"
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_supported_currencies() -> dict[str, str]:
+    """Return currency codes and names supported by Frankfurter."""
+    response = requests.get("https://api.frankfurter.dev/v2/currencies", timeout=10)
+    response.raise_for_status()
+    payload = response.json()
+    return {
+        item["iso_code"]: item.get("name", item["iso_code"])
+        for item in payload
+        if item.get("iso_code")
+    }
 
 # Local CSV storage. Workspace names are identifiers, not authentication.
 BASE_DIR = Path(__file__).resolve().parent
@@ -306,28 +346,58 @@ if st.session_state.logged_in:
 
     elif menu == "Currency Converter":
         st.header("💱 Currency Converter")
+        st.caption("Live published reference rates · Frankfurter API · refreshed hourly while the app is active")
 
-        st.info("These are illustrative fixed rates for demonstrating conversion logic, not live exchange rates.")
-        exchange_rates = {
-            "USD": 1.0,
-            "EUR": 0.92,
-            "INR": 83.0,
-            "GBP": 0.78,
-            "JPY": 155.0
-        }
+        try:
+            currencies = fetch_supported_currencies()
+        except (requests.RequestException, ValueError, KeyError) as exc:
+            st.error("Could not load the supported currencies. Please retry when the rate service is available.")
+            st.caption(f"Service detail: {type(exc).__name__}")
+            st.stop()
+
+        # Keep common currencies easy to find while exposing the full API-supported list.
+        preferred = ["INR", "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "SGD"]
+        currency_codes = [code for code in preferred if code in currencies]
+        currency_codes += sorted(code for code in currencies if code not in currency_codes)
 
         col1, col2 = st.columns(2)
         with col1:
-            amount = st.number_input("Amount", min_value=0.0, format="%.2f")
-            from_currency = st.selectbox("From Currency", list(exchange_rates.keys()))
+            amount = st.number_input("Amount", min_value=0.0, value=100.0, format="%.2f")
+            from_currency = st.selectbox(
+                "From Currency", currency_codes,
+                index=currency_codes.index("INR") if "INR" in currency_codes else 0,
+                format_func=lambda code: f"{code} — {currencies[code]}",
+            )
         with col2:
-            to_currency = st.selectbox("To Currency", list(exchange_rates.keys()))
+            to_currency = st.selectbox(
+                "To Currency", currency_codes,
+                index=currency_codes.index("USD") if "USD" in currency_codes else min(1, len(currency_codes) - 1),
+                format_func=lambda code: f"{code} — {currencies[code]}",
+            )
 
-        if st.button("Convert"):
-            if from_currency == to_currency:
-                st.info("Same currency selected. Amount unchanged.")
+        if st.button("Convert", type="primary"):
+            if amount < 0:
+                st.error("Enter an amount greater than or equal to zero.")
+            elif from_currency == to_currency:
+                st.success(f"{amount:,.2f} {from_currency} = {amount:,.2f} {to_currency}")
             else:
-                # Convert to USD base, then to target
-                amount_in_usd = amount / exchange_rates[from_currency]
-                converted = amount_in_usd * exchange_rates[to_currency]
-                st.success(f"{amount:.2f} {from_currency} = {converted:.2f} {to_currency}")
+                try:
+                    with st.spinner("Fetching the latest published reference rate…"):
+                        rates, rate_date = fetch_exchange_rates(from_currency)
+                    if to_currency not in rates:
+                        st.error(f"No published rate is currently available for {from_currency} → {to_currency}.")
+                    else:
+                        converted = amount * rates[to_currency]
+                        st.success(f"{amount:,.2f} {from_currency} = {converted:,.2f} {to_currency}")
+                        st.caption(
+                            f"Rate: 1 {from_currency} = {rates[to_currency]:,.6f} {to_currency} · "
+                            f"Rate date: {rate_date}"
+                        )
+                except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+                    st.error("Live rates are temporarily unavailable. Please try again shortly.")
+                    st.caption(f"Service detail: {type(exc).__name__}")
+
+        st.info(
+            "Rates come from Frankfurter's published reference data and are cached for up to one hour. "
+            "They update daily on working days, not in real time, and may differ from bank, card, or cash-exchange rates."
+        )
