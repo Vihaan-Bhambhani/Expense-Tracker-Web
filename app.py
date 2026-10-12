@@ -48,7 +48,7 @@ st.markdown("""
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_exchange_rates(base_currency: str) -> tuple[dict[str, float], str]:
+def fetch_exchange_rates(base_currency: str) -> tuple[dict[str, float], dict[str, str]]:
     """Fetch latest published reference rates from Frankfurter (daily, not intraday)."""
     response = requests.get(
         "https://api.frankfurter.dev/v2/rates",
@@ -59,17 +59,17 @@ def fetch_exchange_rates(base_currency: str) -> tuple[dict[str, float], str]:
     payload = response.json()
 
     rates = {base_currency: 1.0}
-    rate_date = None
+    rate_dates = {base_currency: "not required"}
     for item in payload:
         quote = item.get("quote")
         rate = item.get("rate")
         if quote and isinstance(rate, (int, float)) and rate > 0:
             rates[quote] = float(rate)
-            rate_date = max(rate_date or item.get("date", ""), item.get("date", ""))
+            rate_dates[quote] = item.get("date", "date not supplied")
 
     if len(rates) < 2:
         raise ValueError("The exchange-rate service returned no usable rates.")
-    return rates, rate_date or "date not supplied"
+    return rates, rate_dates
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -383,7 +383,7 @@ if st.session_state.logged_in:
             else:
                 try:
                     with st.spinner("Fetching the latest published reference rate…"):
-                        rates, rate_date = fetch_exchange_rates(from_currency)
+                        rates, rate_dates = fetch_exchange_rates(from_currency)
                     if to_currency not in rates:
                         st.error(f"No published rate is currently available for {from_currency} → {to_currency}.")
                     else:
@@ -391,7 +391,7 @@ if st.session_state.logged_in:
                         st.success(f"{amount:,.2f} {from_currency} = {converted:,.2f} {to_currency}")
                         st.caption(
                             f"Rate: 1 {from_currency} = {rates[to_currency]:,.6f} {to_currency} · "
-                            f"Rate date: {rate_date}"
+                            f"Rate date: {rate_dates.get(to_currency, 'date not supplied')}"
                         )
                 except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
                     st.error("Live rates are temporarily unavailable. Please try again shortly.")
