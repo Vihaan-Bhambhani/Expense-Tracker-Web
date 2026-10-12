@@ -70,9 +70,9 @@ def test_primary_workflow(page):
         # Add expense through the actual form.
         page.get_by_text("Add New Expense", exact=True).click()
         expect(page.locator("body")).to_contain_text("Add a New Expense")
-        page.get_by_label("Date").click()
         page.get_by_label("Amount").fill("123.45")
-        page.get_by_label("Currency").select_option(label="INR")
+        page.get_by_label("Currency").click()
+        page.get_by_text("INR", exact=True).last.click()
         page.get_by_label("Description (optional)").fill("Synthetic QA smoke-test expense")
         click_button(page, "Add Expense")
         expect(page.locator("body")).to_contain_text("Expense added successfully")
@@ -90,13 +90,15 @@ def test_primary_workflow(page):
         # Verify currency converter basic math and same-currency handling.
         page.get_by_text("Currency Converter", exact=True).click()
         page.get_by_label("Amount").fill("100")
-        page.get_by_label("From Currency").select_option(label="USD")
-        page.get_by_label("To Currency").select_option(label="INR")
+        page.get_by_label("From Currency").click()
+        page.get_by_text("USD", exact=True).last.click()
+        page.get_by_label("To Currency").click()
+        page.get_by_text("INR", exact=True).last.click()
         click_button(page, "Convert")
         expect(page.locator("body")).to_contain_text("8300")
         # Close and reopen workspace to check persistence in the hosted filesystem.
         page.get_by_role("button", name=re.compile("Close Workspace", re.I)).click()
-        page.get_by_label("Workspace action").get_by_text("Open Existing Workspace").click()
+        page.get_by_text("Open Existing Workspace", exact=True).click()
         page.get_by_label("Workspace name").fill(workspace)
         click_button(page, "Continue")
         page.get_by_text("View Expenses", exact=True).click()
@@ -116,22 +118,23 @@ def test_primary_workflow(page):
         expect(page.locator("body")).to_contain_text("QA synthetic task " + suffix)
         # Move it to Done and enter actual hours.
         status = page.get_by_label("Status").last
-        status.select_option(label="Done")
+        status.click()
+        page.get_by_text("Done", exact=True).last.click()
         expect(page.locator("body")).to_contain_text("Done")
         hours = page.get_by_label(re.compile("Actual hours", re.I)).last
         hours.fill("1.5")
         hours.press("Tab")
         # Verify analytics tab renders and contains the task metrics.
-        page.get_by_text("Analytics Dashboard", exact=True).click()
+        page.get_by_role("tab", name=re.compile("Analytics Dashboard", re.I)).click()
         expect(page.locator("body")).to_contain_text("Total Tasks")
         expect(page.locator("body")).to_contain_text("Completion Rate")
         # Verify performance tab is reachable and does not show a fatal traceback.
-        page.get_by_text("Performance Insights", exact=True).click()
+        page.get_by_role("tab", name=re.compile("Performance Insights", re.I)).click()
         expect(page.locator("body")).to_contain_text("Performance")
         assert "Traceback (most recent call last)" not in page.locator("body").inner_text()
         # Return to board and delete the test task to limit test-data residue.
-        page.get_by_text("Kanban Board", exact=True).click()
-        click_button(page, "Delete task")
+        page.get_by_role("tab", name=re.compile("Kanban Board", re.I)).click()
+        page.get_by_role("button", name=re.compile("🗑️")).last.click()
         expect(page.locator("body")).not_to_contain_text("QA synthetic task " + suffix)
         # Log out and verify login screen returns.
         click_button(page, "Logout")
