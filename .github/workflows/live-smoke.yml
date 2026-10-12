@@ -25,8 +25,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run live end-to-end smoke tests
         env:
-          expense: ${{ vars.expense }}
-          BASE_URL: ${{ vars.BASE_URL }}
+          APP_KIND: expense
+          BASE_URL: https://expense-tracker-web-vb.streamlit.app/
         run: |
           python -m pytest -v -s qa/test_live_app.py --junitxml=qa-results.xml
       - name: Upload browser screenshots and test report
