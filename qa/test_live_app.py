@@ -36,7 +36,7 @@ def page(browser):
     response = page.goto(BASE_URL, wait_until="domcontentloaded", timeout=45_000)
     assert response is not None and response.status < 400, f"App returned HTTP {response.status if response else 'no response'}"
     # Wait for Streamlit's websocket-backed app to render.
-    app = page.frame_locator("iframe")
+    app = page.frame_locator('iframe[title="streamlitApp"]')
     expect(app.locator("body")).to_contain_text(re.compile(r".+"), timeout=30_000)
     yield app
     page.screenshot(path=str(ARTIFACTS / f"{APP_KIND}-final.png"), full_page=True)
