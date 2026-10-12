@@ -334,14 +334,31 @@ if st.session_state.logged_in:
                                 .sum()
                                 .sort_values("Month")
                             )
+                            # Use readable month labels on a categorical axis so Plotly
+                            # doesn't infer timestamps and display meaningless time ticks.
+                            monthly_summary["MonthLabel"] = pd.to_datetime(
+                                monthly_summary["Month"] + "-01"
+                            ).dt.strftime("%b %Y")
+                            month_order = monthly_summary["MonthLabel"].tolist()
                             fig_month = px.line(
                                 monthly_summary,
-                                x="Month",
+                                x="MonthLabel",
                                 y="Amount",
                                 markers=True,
-                                title=f"Monthly Spend ({selected_currency})"
+                                title=f"Monthly Spend ({selected_currency})",
+                                category_orders={"MonthLabel": month_order},
                             )
-                            fig_month.update_layout(xaxis_title="Month", yaxis_title=f"Amount ({selected_currency})")
+                            fig_month.update_xaxes(
+                                type="category",
+                                categoryorder="array",
+                                categoryarray=month_order,
+                                tickangle=-35,
+                                automargin=True,
+                            )
+                            fig_month.update_layout(
+                                xaxis_title="Month",
+                                yaxis_title=f"Amount ({selected_currency})",
+                            )
                             st.plotly_chart(fig_month, width="stretch")
 
     elif menu == "Currency Converter":
