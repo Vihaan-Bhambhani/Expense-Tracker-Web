@@ -110,6 +110,9 @@ if not st.session_state.logged_in:
                 else:
                     st.session_state.username = username
                     st.session_state.df = load_user_data(username)
+                    if mode == "Create New Workspace":
+                        # Persist even an empty workspace so it can be reopened after closing.
+                        save_user_data(username, st.session_state.df)
                     st.session_state.logged_in = True
                     st.rerun()
 
